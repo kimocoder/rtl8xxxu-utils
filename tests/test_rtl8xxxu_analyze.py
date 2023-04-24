@@ -38,7 +38,7 @@ def test_get_metadata_valid_filenames():
 
 @pytest.fixture()
 def path_to_pcap():
-    return os.path.dirname(__file__) + '/rtl8xxxu_capture.pcap'
+    return f'{os.path.dirname(__file__)}/rtl8xxxu_capture.pcap'
 
 
 def test_count_packets_no_filter(path_to_pcap):

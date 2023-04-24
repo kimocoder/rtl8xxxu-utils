@@ -90,7 +90,7 @@ class FieldDescription:
     def from_range(cls, name: str, begin: int, end: int):
         """Create MaskDescription from non-negative, zero-based indexes"""
         if end <= begin or begin < 0:
-            raise ValueError(f'Illegal bit positions')
+            raise ValueError('Illegal bit positions')
         bitmask = 0
         for i in range(begin, end):
             bitmask |= 0x1 << i
@@ -242,7 +242,7 @@ class RegisterDescription:
     def add_field(self, field_description: FieldDescription) -> None:
         # Create dict to map each bit to its field description (or None)
         if len(self.fields) != self.size * 8:
-            self.fields = {i: None for i in range(0, self.size * 8)}
+            self.fields = {i: None for i in range(self.size * 8)}
         if self.size * 8 < field_description.end:
             raise RuntimeError(
                 f'Bit #{field_description.end - 1} of field {field_description.name} exceeds {self.size} bytes size of register "{self.name}"')
@@ -272,7 +272,7 @@ class RegisterDescription:
 
     @property
     def known_fields(self) -> List[FieldDescription]:
-        return sorted(set(x for x in self.fields.values() if x))
+        return sorted({x for x in self.fields.values() if x})
 
     def get_affected_fields(self, bitmask: int) -> List[FieldDescription]:
         begin_to_field = []
@@ -345,7 +345,7 @@ class RegisterMap:
 
     @property
     def registers_with_names(self) -> List[RegisterDescription]:
-        return sorted(set(x for x in self._address_to_register.values() if x))
+        return sorted({x for x in self._address_to_register.values() if x})
 
     def print(self, file=sys.stdout):
         for register in self.registers_with_names:
@@ -368,34 +368,36 @@ def register_maps_from_header(rtl8xxxu_header_content: Union[List[str], str]) ->
 
 
 def _parse_rtl8xxxu_reg_header_extract_register(line: str) -> Optional[PartialRegisterDescription]:
-    if match_register := re.match(f"^#define (?P<name>(RF6052_)?REG_[A-Z_0-9]+)	+(?P<base_address>0x[a-f0-9]+)",
-                                  line):
-        name = match_register.group('name')
+    if match_register := re.match(
+        "^#define (?P<name>(RF6052_)?REG_[A-Z_0-9]+)	+(?P<base_address>0x[a-f0-9]+)",
+        line,
+    ):
+        name = match_register['name']
         if name in fixups.REGISTER_NAMES_TO_IGNORE:
             return
-        base_address = int(match_register.group('base_address'), 16)
+        base_address = int(match_register['base_address'], 16)
         return PartialRegisterDescription(name, base_address)
 
 
 def _parse_rtl8xxxu_reg_header_extract_field(line: str) -> Optional[FieldDescription]:
     if match_bit := re.match(r"^#define {2}(?P<name>[A-Z_0-9]+)	+BIT\((?P<bit>[0-9]+)\)", line):
-        name = match_bit.group('name')
+        name = match_bit['name']
         if name in fixups.MASK_NAMES_TO_IGNORE:
             return
-        bit = int(match_bit.group('bit'))
+        bit = int(match_bit['bit'])
         return FieldDescription.from_range(name, bit, bit + 1)
     if match_mask := re.match(r"^#define {2}(?P<name>[A-Z_0-9]+)_MASK	+(?P<mask>0x[0-9a-z]+)", line):
-        name = match_mask.group('name')
+        name = match_mask['name']
         if name in fixups.MASK_NAMES_TO_IGNORE:
             return
-        mask = int(match_mask.group('mask'), 16)
+        mask = int(match_mask['mask'], 16)
         return FieldDescription(name, mask)
     if match_bits := re.match(r"^#define {2}(?P<name>[A-Z_0-9]+)	+\((?P<bits>(BIT\([0-9]+\) \| )+BIT\([0-9]+\))\)",
                               line):
-        name = match_bits.group('name')
+        name = match_bits['name']
         if name in fixups.MASK_NAMES_TO_IGNORE:
             return
-        bits = sorted([int(x) for x in re.findall(r'\d+', match_bits.group('bits'))])
+        bits = sorted([int(x) for x in re.findall(r'\d+', match_bits['bits'])])
         if len(bits) != len(set(bits)):
             raise RuntimeError(f"Duplicates in bit mask: {line}")
         if bits[-1] - bits[0] != len(bits) - 1:

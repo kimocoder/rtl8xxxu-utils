@@ -44,7 +44,7 @@ def test_mismatching_addresses(register_dump_collection_rf):
 
 def test_register_differ(register_dump_collection_rf, register_map_rf):
     rg = RegisterDiffer(register_dump_collection_rf, register_map_rf)
-    names_of_relevant_registers = set(r.name for r in rg.get_mismatching_registers())
+    names_of_relevant_registers = {r.name for r in rg.get_mismatching_registers()}
     assert names_of_relevant_registers == {'AC', 'BS_PA_APSET_G1_G4'}
 
 

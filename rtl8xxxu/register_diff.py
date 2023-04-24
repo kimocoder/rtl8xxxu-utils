@@ -26,10 +26,7 @@ class RegisterDiffer:
         return mismatching_registers
 
     def get_mismatching_register_values(self, register: RegisterDescription) -> List[int]:
-        result = []
-        for dump in self.dump_collection.dumps:
-            result.append(dump.register_value(register))
-        return result
+        return [dump.register_value(register) for dump in self.dump_collection.dumps]
 
     def get_mismatching_register_fields_description(self, register: RegisterDescription) -> List[Dict]:
         result = []
@@ -47,19 +44,18 @@ class RegisterDiffer:
             })
 
         # Without known fields, printing the unknown field does not make sense
-        if len(result) == 0:
+        if not result:
             return []
 
         unknown_field = register.unknown_field
         values = [unknown_field.get_value(register_value) for register_value in mismatching_register_values]
-        if len(set(values)) > 1 or True:
-            result.append({
-                'name': unknown_field.name,
-                'bitmask': unknown_field.bitmask,
-                'nibbles': register.size * 2,
-                'values': values,
-                'hint': ''
-            })
+        result.append({
+            'name': unknown_field.name,
+            'bitmask': unknown_field.bitmask,
+            'nibbles': register.size * 2,
+            'values': values,
+            'hint': ''
+        })
         return result
 
     def get_mismatching(self):
@@ -79,7 +75,7 @@ class RegisterDiffer:
 
     def print_tabular(self):
         print(f'# Register value delta analysis for {self.register_map.section.name} registers')
-        print(f'## Inputs ')
+        print('## Inputs ')
         for index, short_filename in enumerate(self.dump_collection.dump_filenames_shortened):
             print(f' - #{index}: {short_filename}')
 

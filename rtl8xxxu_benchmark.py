@@ -33,7 +33,7 @@ class DUT:
         self.unload_all_drivers()
 
     def flush_logs(self):
-        log.info(f'Flushing journalctl')
+        log.info('Flushing journalctl')
         self.connection.run('sudo journalctl --rotate --vacuum-size=1', timeout=5, hide=hide_ssh_output)
 
     @property
@@ -45,28 +45,28 @@ class DUT:
         return int(phy_index)
 
     def unload_all_drivers(self):
-        log.info(f'Unloading all drivers')
+        log.info('Unloading all drivers')
         self.connection.run('rmmod rtl8xxxu rtl8192cu rtl8192c_common rtl_usb rtlwifi 8192cu 2>/dev/null',
                             warn=True,
                             timeout=5,
                             hide=hide_ssh_output)
 
     def wpa_supplicant_stop(self):
-        log.info(f'Stopping wpa_supplicant')
+        log.info('Stopping wpa_supplicant')
         self.connection.run(f'systemctl stop wpa_supplicant@{self.wlan_interface}.service', timeout=15,
                             hide=hide_ssh_output)
 
     def wpa_supplicant_start(self):
-        log.info(f'Starting wpa_supplicant')
+        log.info('Starting wpa_supplicant')
         self.connection.run(f'systemctl start wpa_supplicant@{self.wlan_interface}.service', timeout=15,
                             hide=hide_ssh_output)
 
     def dhclient_request(self):
-        log.info(f'Request IPv4 address via DHCP')
+        log.info('Request IPv4 address via DHCP')
         self.connection.run(f'dhclient -i  {self.wlan_interface}', timeout=30, hide=hide_ssh_output)
 
     def dhclient_release(self):
-        log.info(f'Return IPv4 address via DHCP')
+        log.info('Return IPv4 address via DHCP')
         self.connection.run(f'dhclient -r  {self.wlan_interface}', timeout=15, hide=hide_ssh_output)
 
     def load_driver(self, driver):
@@ -156,7 +156,7 @@ class Driver:
 
     @property
     def versioned_driver_filename(self):
-        return self._append_version_to_ko_filename(self.name + '.ko')
+        return self._append_version_to_ko_filename(f'{self.name}.ko')
 
     def deploy(self, connection):
         if self.name == 'rtl8xxxu':
@@ -172,9 +172,7 @@ class Driver:
 
     def driver_dependencies(self):
         """Modules having to be loaded before insmod-ing a this driver"""
-        if self.name == '8192cu':
-            return ['cfg80211']
-        return ['mac80211']
+        return ['cfg80211'] if self.name == '8192cu' else ['mac80211']
 
     def driver_filenames(self):
         if self.name in ('rtl8xxxu', '8192cu'):
@@ -191,10 +189,10 @@ def ipv4_tcp_port_is_open(host, port):
 
 
 def linux_src_from_build_directory(linux_build_directory):
-    with open(linux_build_directory + '/Makefile') as makefile:
+    with open(f'{linux_build_directory}/Makefile') as makefile:
         include_line = makefile.readlines()[1]
         m = re.match('^include (.+)/Makefile$', include_line)
-        return m.group(1)
+        return m[1]
 
 
 def run_and_save(cmd, dut, filename, timeout=30) -> str:
@@ -321,7 +319,7 @@ def main():
 
     # Sanitize arguments
     if '8192cu' in args.drivers and not args.realtek_8192cu_directory:
-        log.fatal(f'Argument --realtek-8192cu-directory needed when testing 8192cu')
+        log.fatal('Argument --realtek-8192cu-directory needed when testing 8192cu')
         sys.exit(-1)
     # Check if IPerf3 server port is still available, produce descriptive error message if not
     if ipv4_tcp_port_is_open('localhost', args.iperf3_port):
@@ -335,7 +333,7 @@ def main():
             args.linux_build_directory)
         driver = Driver(driver_name, src_dir, args.linux_build_directory)
         if not driver.sources_are_clean():
-            log.fatal(f'Refusing to work on dirty source directory!')
+            log.fatal('Refusing to work on dirty source directory!')
             sys.exit(-1)
         driver.build()
         drivers[driver_name] = driver
@@ -354,18 +352,15 @@ def main():
     symlink_name.symlink_to(dirname)
 
     # Run test with all driver and direction combinations
-    run_and_save(f'journalctl', dut, f'{args.save_to}/{dirname}/initial-journalctl')
+    run_and_save('journalctl', dut, f'{args.save_to}/{dirname}/initial-journalctl')
     for direction, driver in itertools.product(args.directions, drivers.values()):
         log.info(f'Testing driver {driver} in direction {direction}')
         log_filename_prefix = f'{args.save_to}/{dirname}/{driver.versioned_driver_filename}-{direction}'
         dut.wpa_supplicant_stop()
         dut.unload_all_drivers()
         dut.flush_logs()
-        with subprocess.Popen(['tcpdump', '-i', args.mon_interface, '-U', '-w', log_filename_prefix + '.pcap'],
-                              stdout=subprocess.PIPE,
-                              stderr=subprocess.PIPE) as tcpdump, \
-                subprocess.Popen(['iperf3', '-s', '-1', '--port', str(args.iperf3_port)], stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE) as iperf3_server:
+        with (subprocess.Popen(['tcpdump', '-i', args.mon_interface, '-U', '-w', f'{log_filename_prefix}.pcap'], stdout=subprocess.PIPE, stderr=subprocess.PIPE) as tcpdump, subprocess.Popen(['iperf3', '-s', '-1', '--port', str(args.iperf3_port)], stdout=subprocess.PIPE,
+                                         stderr=subprocess.PIPE) as iperf3_server):
             try:
                 dut.load_driver(driver)
                 time.sleep(1)  # 8192cu drivers needs some time to initialize
@@ -373,7 +368,7 @@ def main():
                 time.sleep(3)  # 8192cu drivers needs some time to initialize
                 dut.set_link_up()
                 dump_registers(dut, driver, log_filename_prefix, "01-link-up")
-                run_and_save(f'iw list', dut, f'{log_filename_prefix}.iw-list')
+                run_and_save('iw list', dut, f'{log_filename_prefix}.iw-list')
                 run_and_save(f'iw dev {dut.wlan_interface} scan', dut, f'{log_filename_prefix}.iw-scan')
                 dump_registers(dut, driver, log_filename_prefix, "02-scan-done")
                 dut.wpa_supplicant_start()
@@ -392,7 +387,7 @@ def main():
             finally:
                 terminate_process(tcpdump, 'tcpdump')
                 terminate_process(iperf3_server, 'iperf3 server', [0, 1])
-                run_and_save(f'journalctl', dut, f'{log_filename_prefix}.journalctl')
+                run_and_save('journalctl', dut, f'{log_filename_prefix}.journalctl')
 
         run_and_save(f'iw dev {dut.wlan_interface} station dump', dut, f'{log_filename_prefix}.iw-station-dump')
         dut.dhclient_release()

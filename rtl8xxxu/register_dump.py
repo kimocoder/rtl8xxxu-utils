@@ -28,9 +28,7 @@ class Dump:
 
     @property
     def driver_name(self):
-        if self.driver:
-            return self.driver
-        return "unknown driver"
+        return self.driver if self.driver else "unknown driver"
 
     @classmethod
     def parse_dump(cls, dump_file: RawDump):
@@ -39,8 +37,8 @@ class Dump:
         if (m := re.search('^=+ (?P<section>[A-Z]+) REG \\((?P<driver>[a-z0-9]+)\\) =+$', header_line)) is None:
             raise RuntimeError(f"Invalid header: {header_line}")
 
-        driver = m.group('driver')
-        section = NAME_TO_ANY_REGISTER_SECTION[m.group('section')]
+        driver = m['driver']
+        section = NAME_TO_ANY_REGISTER_SECTION[m['section']]
 
         value_at_address: Dict[int, bytes] = {}
         for line in lines[1:]:
@@ -50,15 +48,15 @@ class Dump:
                 log.warning(f"Invalid line: {line}")
                 continue
 
-            address_offset = int(m.group('address'), 16)
-            for register_value_hex_string in m.group('values').split():
+            address_offset = int(m['address'], 16)
+            for register_value_hex_string in m['values'].split():
                 four_bytes = bytearray.fromhex(register_value_hex_string[2:])
                 if section.register_length_max == 1:
                     value_at_address[address_offset] = four_bytes
                     address_offset += 1
                 else:
                     four_bytes.reverse()
-                    for offset_within_register in range(0, section.register_length_max):
+                    for offset_within_register in range(section.register_length_max):
                         value_at_address[address_offset + offset_within_register] = four_bytes[
                                                                                     offset_within_register:offset_within_register + 1]
                     address_offset += 4
@@ -68,10 +66,7 @@ class Dump:
     @property
     def size(self):
         """Number of bytes in this dump"""
-        s = 0
-        for x in self.address_to_value.values():
-            s += len(x)
-        return s
+        return sum(len(x) for x in self.address_to_value.values())
 
     def register_value(self, register: RegisterDescription) -> int:
         if register.depth > 1:

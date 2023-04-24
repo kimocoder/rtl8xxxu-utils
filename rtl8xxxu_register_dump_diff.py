@@ -41,12 +41,10 @@ def main():
 
     register_maps_by_section_name = register_maps_from_header(args.header.readlines())
     dump_collections_by_section_name = Collection.from_files(args.dump)
-    table_index = 0
-    for section_name, dump_collection in dump_collections_by_section_name.items():
+    for table_index, (section_name, dump_collection) in enumerate(dump_collections_by_section_name.items()):
         rg = RegisterDiffer(dump_collection, register_maps_by_section_name[section_name])
         if table_index:
             print('')
-        table_index += 1
         rg.print_tabular()
 
 
